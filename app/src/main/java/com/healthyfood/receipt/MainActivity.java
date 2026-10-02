@@ -6,1633 +6,329 @@ import android.bluetooth.*;
 import android.content.*;
 import android.content.pm.PackageManager;
 import android.graphics.*;
+import android.graphics.drawable.GradientDrawable;
 import android.os.*;
 import android.provider.Settings;
+import android.text.*;
+import android.util.TypedValue;
 import android.view.*;
 import android.widget.*;
-import android.text.InputType;
-
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.text.SimpleDateFormat;
+import java.util.TimeZone;
 
 public class MainActivity extends Activity {
-
     EditText amount, product;
-
     TextView baseText, gstText, totalText, printerText;
-
     BluetoothAdapter bt;
     BluetoothDevice selectedPrinter;
-
     static final int REQ_BT = 100;
-
-    static final UUID SPP_UUID =
-            UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
-
+    static final UUID SPP_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
     android.content.SharedPreferences prefs;
 
+    int dp(float v) { return (int)(v * getResources().getDisplayMetrics().density + 0.5f); }
+    TextView tv(String text, float size, boolean bold) {
+        TextView t = new TextView(this);
+        t.setText(text);
+        t.setTextSize(TypedValue.COMPLEX_UNIT_DIP, size);
+        t.setTextColor(Color.BLACK);
+        if (bold) t.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        return t;
+    }
+    GradientDrawable bg(int color, float radius) {
+        GradientDrawable g = new GradientDrawable();
+        g.setColor(color); g.setCornerRadius(dp(radius)); return g;
+    }
 
-    // =========================================================
-    // ACTIVITY START
-    // =========================================================
-
-    @Override
-    public void onCreate(Bundle b) {
-
+    @Override public void onCreate(Bundle b) {
         super.onCreate(b);
-
         prefs = getSharedPreferences("settings", MODE_PRIVATE);
-
+        if (Build.VERSION.SDK_INT >= 30) getWindow().setStatusBarColor(Color.WHITE);
+        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
         buildUi();
-
         bt = BluetoothAdapter.getDefaultAdapter();
-
         requestBtPermission();
-
         autoLoadPrinter();
     }
 
-
-    // =========================================================
-    // DP HELPER
-    // =========================================================
-
-    int dp(int value) {
-
-        return (int) (
-                value *
-                getResources().getDisplayMetrics().density
-                + 0.5f
-        );
-    }
-
-
-    // =========================================================
-    // MAIN USER INTERFACE
-    // =========================================================
-
     void buildUi() {
-
         ScrollView scroll = new ScrollView(this);
-
         scroll.setFillViewport(true);
-
         scroll.setBackgroundColor(Color.WHITE);
 
-
         LinearLayout root = new LinearLayout(this);
-
         root.setOrientation(LinearLayout.VERTICAL);
-
-        root.setPadding(
-                dp(20),
-                dp(16),
-                dp(20),
-                dp(16)
-        );
-
-        root.setBackgroundColor(Color.WHITE);
-
-
-        // -----------------------------------------------------
-        // HEADER
-        // -----------------------------------------------------
-
-        TextView title = new TextView(this);
-
-        title.setText(
-                "HEALTHY FOOD\nCash Receipt"
-        );
-
-        title.setTextSize(23);
-
-        title.setTextColor(Color.BLACK);
-
-        title.setGravity(Gravity.CENTER);
-
-        title.setTypeface(
-                Typeface.DEFAULT,
-                Typeface.BOLD
-        );
-
-        root.addView(
-                title,
-                new LinearLayout.LayoutParams(
-                        -1,
-                        LinearLayout.LayoutParams.WRAP_CONTENT
-                )
-        );
-
-
-        // -----------------------------------------------------
-        // LOGO
-        // -----------------------------------------------------
-
-        ImageView logo = new ImageView(this);
-
-        logo.setImageResource(
-                com.healthyfood.receipt.R.drawable.healthy_food_logo
-        );
-
-        logo.setColorFilter(
-                new ColorMatrixColorFilter(grayMatrix())
-        );
-
-        logo.setAdjustViewBounds(true);
-
-        logo.setScaleType(
-                ImageView.ScaleType.CENTER_INSIDE
-        );
-
-
-        LinearLayout.LayoutParams logoParams =
-                new LinearLayout.LayoutParams(
-                        -1,
-                        dp(100)
-                );
-
-        logoParams.setMargins(
-                0,
-                dp(6),
-                0,
-                dp(4)
-        );
-
-        root.addView(
-                logo,
-                logoParams
-        );
-
-
-        // -----------------------------------------------------
-        // GST + FSSAI
-        // -----------------------------------------------------
-
-        TextView registration = new TextView(this);
-
-        registration.setText(
-                "GST: 06KOWPS3125E2ZF\n" +
-                "FSSAI: 22724926000547"
-        );
-
-        registration.setTextSize(12);
-
-        registration.setTextColor(Color.DKGRAY);
-
-        registration.setGravity(Gravity.CENTER);
-
-        registration.setTypeface(
-                Typeface.DEFAULT,
-                Typeface.BOLD
-        );
-
-        LinearLayout.LayoutParams registrationParams =
-                new LinearLayout.LayoutParams(
-                        -1,
-                        dp(48)
-                );
-
-        registrationParams.setMargins(
-                0,
-                dp(2),
-                0,
-                dp(6)
-        );
-
-        root.addView(
-                registration,
-                registrationParams
-        );
-
-
-        // -----------------------------------------------------
-        // PRODUCT LABEL
-        // -----------------------------------------------------
-
-        TextView productLabel = new TextView(this);
-
-        productLabel.setText(
-                "Optional product / service name"
-        );
-
-        productLabel.setTextSize(13);
-
-        productLabel.setTextColor(Color.DKGRAY);
-
-        productLabel.setGravity(Gravity.CENTER);
-
-        root.addView(
-                productLabel,
-                new LinearLayout.LayoutParams(
-                        -1,
-                        dp(30)
-                )
-        );
-
-
-        // -----------------------------------------------------
-        // PRODUCT INPUT
-        // -----------------------------------------------------
-
-        product = new EditText(this);
-
-        product.setHint(
-                "e.g. Veg Thali"
-        );
-
-        product.setSingleLine(true);
-
-        product.setTextSize(16);
-
-        product.setPadding(
-                dp(12),
-                0,
-                dp(12),
-                0
-        );
-
-        root.addView(
-                product,
-                new LinearLayout.LayoutParams(
-                        -1,
-                        dp(52)
-                )
-        );
-
-
-        // -----------------------------------------------------
-        // AMOUNT LABEL
-        // -----------------------------------------------------
-
-        TextView amountLabel = new TextView(this);
-
-        amountLabel.setText(
-                "Enter TOTAL amount paid (5% IGST included)"
-        );
-
-        amountLabel.setTextSize(13);
-
-        amountLabel.setTextColor(Color.DKGRAY);
-
-        amountLabel.setGravity(Gravity.CENTER);
-
-        LinearLayout.LayoutParams amountLabelParams =
-                new LinearLayout.LayoutParams(
-                        -1,
-                        dp(32)
-                );
-
-        amountLabelParams.setMargins(
-                0,
-                dp(8),
-                0,
-                0
-        );
-
-        root.addView(
-                amountLabel,
-                amountLabelParams
-        );
-
-
-        // -----------------------------------------------------
-        // AMOUNT INPUT
-        // -----------------------------------------------------
-
-        amount = new EditText(this);
-
-        amount.setHint(
-                "₹ 0.00"
-        );
-
-        amount.setInputType(
-                InputType.TYPE_CLASS_NUMBER |
-                InputType.TYPE_NUMBER_FLAG_DECIMAL
-        );
-
-        amount.setTextSize(26);
-
-        amount.setGravity(
-                Gravity.CENTER
-        );
-
-        amount.setSingleLine(true);
-
-        amount.setPadding(
-                dp(8),
-                0,
-                dp(8),
-                0
-        );
-
-        root.addView(
-                amount,
-                new LinearLayout.LayoutParams(
-                        -1,
-                        dp(60)
-                )
-        );
-
-
-        amount.addTextChangedListener(
-                new android.text.TextWatcher() {
-
-                    public void beforeTextChanged(
-                            CharSequence s,
-                            int start,
-                            int count,
-                            int after) {
-                    }
-
-                    public void onTextChanged(
-                            CharSequence s,
-                            int start,
-                            int before,
-                            int count) {
-
-                        updateCalc();
-                    }
-
-                    public void afterTextChanged(
-                            android.text.Editable e) {
-                    }
-                }
-        );
-
-
-        // -----------------------------------------------------
-        // CALCULATION BOX
-        // -----------------------------------------------------
-
-        LinearLayout calc =
-                new LinearLayout(this);
-
-        calc.setOrientation(
-                LinearLayout.VERTICAL
-        );
-
-        calc.setPadding(
-                dp(8),
-                dp(8),
-                dp(8),
-                dp(8)
-        );
-
-        calc.setBackgroundColor(
-                Color.rgb(245, 245, 245)
-        );
-
-
-        baseText = addRow(
-                calc,
-                "Amount before IGST:",
-                "Rs.0.00"
-        );
-
-
-        gstText = addRow(
-                calc,
-                "IGST @ 5%:",
-                "Rs.0.00"
-        );
-
-
-        totalText = addRow(
-                calc,
-                "TOTAL PAID:",
-                "Rs.0.00"
-        );
-
-
-        LinearLayout.LayoutParams calcParams =
-                new LinearLayout.LayoutParams(
-                        -1,
-                        LinearLayout.LayoutParams.WRAP_CONTENT
-                );
-
-        calcParams.setMargins(
-                0,
-                dp(8),
-                0,
-                dp(8)
-        );
-
-
-        root.addView(
-                calc,
-                calcParams
-        );
-
-
-        // -----------------------------------------------------
-        // PRINTER STATUS
-        // -----------------------------------------------------
-
-        printerText = new TextView(this);
-
-        printerText.setText(
-                "Printer: not selected"
-        );
-
-        printerText.setTextSize(13);
-
-        printerText.setTextColor(
-                Color.DKGRAY
-        );
-
-        printerText.setGravity(
-                Gravity.CENTER
-        );
-
-        printerText.setPadding(
-                0,
-                dp(6),
-                0,
-                dp(6)
-        );
-
-
-        root.addView(
-                printerText,
-                new LinearLayout.LayoutParams(
-                        -1,
-                        dp(36)
-                )
-        );
-
-
-        // -----------------------------------------------------
-        // SELECT PRINTER BUTTON
-        // -----------------------------------------------------
-
-        Button select = new Button(this);
-
-        select.setText(
-                "SELECT PRINTER"
-        );
-
-        select.setTextSize(14);
-
-        select.setOnClickListener(
-                v -> choosePrinter()
-        );
-
-
-        root.addView(
-                select,
-                new LinearLayout.LayoutParams(
-                        -1,
-                        dp(52)
-                )
-        );
-
-
-        // -----------------------------------------------------
-        // PRINT BUTTON
-        // -----------------------------------------------------
-
-        Button print = new Button(this);
-
-        print.setText(
-                "PRINT CASH RECEIPT"
-        );
-
-        print.setTextSize(18);
-
-        print.setTextColor(
-                Color.WHITE
-        );
-
-        print.setBackgroundColor(
-                Color.BLACK
-        );
-
-
-        print.setOnClickListener(
-                v -> printReceipt()
-        );
-
-
-        LinearLayout.LayoutParams printParams =
-                new LinearLayout.LayoutParams(
-                        -1,
-                        dp(58)
-                );
-
-        printParams.setMargins(
-                0,
-                dp(10),
-                0,
-                0
-        );
-
-
-        root.addView(
-                print,
-                printParams
-        );
-
-
-        // -----------------------------------------------------
-        // CLEAR BUTTON
-        // -----------------------------------------------------
-
-        Button clear = new Button(this);
-
-        clear.setText(
-                "CLEAR"
-        );
-
-        clear.setTextSize(14);
-
-
-        clear.setOnClickListener(v -> {
-
-            product.setText("");
-
-            amount.setText("");
-
-            amount.requestFocus();
-
+        root.setPadding(dp(20), dp(12), dp(20), dp(16));
+
+        // Protect the UI from the Android status/navigation bars (especially Android 15).
+        root.setOnApplyWindowInsetsListener((v, insets) -> {
+            int top = insets.getInsets(android.view.WindowInsets.Type.statusBars()).top;
+            int bottom = insets.getInsets(android.view.WindowInsets.Type.navigationBars()).bottom;
+            root.setPadding(dp(20), top + dp(8), dp(20), bottom + dp(12));
+            return insets;
         });
 
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
 
-        LinearLayout.LayoutParams clearParams =
-                new LinearLayout.LayoutParams(
-                        -1,
-                        dp(48)
-                );
+        ImageView logo = new ImageView(this);
+        logo.setImageResource(R.drawable.healthy_food_logo);
+        logo.setColorFilter(new ColorMatrixColorFilter(grayMatrix()));
+        logo.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        header.addView(logo, new LinearLayout.LayoutParams(dp(58), dp(58)));
 
-        clearParams.setMargins(
-                0,
-                dp(4),
-                0,
-                0
-        );
+        TextView title = tv("HEALTHY FOOD\nCash Receipt", 19, true);
+        title.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(0, dp(60), 1);
+        titleLp.setMargins(dp(10), 0, 0, 0);
+        header.addView(title, titleLp);
+        root.addView(header);
 
+        TextView sub = tv("58 mm Bluetooth thermal printer", 12, false);
+        sub.setTextColor(Color.DKGRAY); sub.setGravity(Gravity.CENTER);
+        root.addView(sub, new LinearLayout.LayoutParams(-1, dp(24)));
 
-        root.addView(
-                clear,
-                clearParams
-        );
+        root.addView(label("Product / service (optional)"));
+        product = new EditText(this);
+        product.setHint("e.g. Veg Thali");
+        product.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
+        product.setSingleLine(true);
+        product.setPadding(dp(12), 0, dp(12), 0);
+        root.addView(product, fieldParams(48));
 
+        root.addView(label("TOTAL amount paid (5% IGST included)"));
+        amount = new EditText(this);
+        amount.setHint("Enter amount");
+        amount.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 24);
+        amount.setGravity(Gravity.CENTER);
+        amount.setInputType(2 | 8192);
+        amount.setSingleLine(true);
+        amount.setPadding(dp(12), 0, dp(12), 0);
+        root.addView(amount, fieldParams(56));
+        amount.addTextChangedListener(new TextWatcher() {
+            public void beforeTextChanged(CharSequence s,int st,int c,int a){}
+            public void onTextChanged(CharSequence s,int st,int b,int c){ updateCalc(); }
+            public void afterTextChanged(Editable e){}
+        });
 
-        // -----------------------------------------------------
-        // FOOTER
-        // -----------------------------------------------------
+        LinearLayout calc = new LinearLayout(this);
+        calc.setOrientation(LinearLayout.VERTICAL);
+        calc.setPadding(dp(12), dp(8), dp(12), dp(5));
+        calc.setBackground(bg(Color.rgb(247,247,247), 8));
+        baseText = addRow(calc, "Amount before IGST", "₹0.00", false);
+        gstText = addRow(calc, "IGST @ 5%", "₹0.00", false);
+        totalText = addRow(calc, "TOTAL PAID", "₹0.00", true);
+        LinearLayout.LayoutParams calcLp = new LinearLayout.LayoutParams(-1, -2);
+        calcLp.setMargins(0, dp(8), 0, dp(5));
+        root.addView(calc, calcLp);
 
-        TextView footer = new TextView(this);
+        printerText = tv("Printer: not selected", 12, false);
+        printerText.setTextColor(Color.DKGRAY);
+        printerText.setGravity(Gravity.CENTER);
+        root.addView(printerText, new LinearLayout.LayoutParams(-1, dp(28)));
 
-        footer.setText(
-                "After first printer selection,\n" +
-                "just enter amount → PRINT"
-        );
+        Button select = button("SELECT PRINTER", Color.rgb(235,235,235), Color.BLACK);
+        select.setOnClickListener(v -> choosePrinter());
+        root.addView(select, buttonParams(48));
 
-        footer.setTextSize(11);
+        Button print = button("PRINT CASH RECEIPT", Color.BLACK, Color.WHITE);
+        print.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 17);
+        LinearLayout.LayoutParams printLp = buttonParams(54);
+        printLp.setMargins(0, dp(7), 0, 0);
+        root.addView(print, printLp);
+        print.setOnClickListener(v -> printReceipt());
 
-        footer.setGravity(
-                Gravity.CENTER
-        );
+        Button clear = button("CLEAR", Color.rgb(235,235,235), Color.BLACK);
+        LinearLayout.LayoutParams clearLp = buttonParams(44);
+        clearLp.setMargins(0, dp(6), 0, 0);
+        root.addView(clear, clearLp);
+        clear.setOnClickListener(v -> {
+            product.setText(""); amount.setText(""); amount.requestFocus();
+        });
 
-        footer.setTextColor(
-                Color.DKGRAY
-        );
-
-        footer.setPadding(
-                0,
-                dp(8),
-                0,
-                dp(4)
-        );
-
-
-        root.addView(
-                footer,
-                new LinearLayout.LayoutParams(
-                        -1,
-                        LinearLayout.LayoutParams.WRAP_CONTENT
-                )
-        );
-
-
-        // -----------------------------------------------------
-        // SET SCREEN
-        // -----------------------------------------------------
+        TextView footer = tv("First time: select printer. After that: amount → PRINT", 11, false);
+        footer.setTextColor(Color.DKGRAY); footer.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams f = new LinearLayout.LayoutParams(-1, dp(30));
+        f.setMargins(0, dp(3), 0, 0); root.addView(footer, f);
 
         scroll.addView(root);
-
         setContentView(scroll);
     }
 
-
-    // =========================================================
-    // CALCULATION ROW
-    // =========================================================
-
-    TextView addRow(
-            LinearLayout parent,
-            String left,
-            String right) {
-
-
-        LinearLayout row =
-                new LinearLayout(this);
-
-        row.setOrientation(
-                LinearLayout.HORIZONTAL
-        );
-
-        row.setGravity(
-                Gravity.CENTER_VERTICAL
-        );
-
-
-        TextView leftText =
-                new TextView(this);
-
-        leftText.setText(left);
-
-        leftText.setTextSize(14);
-
-        leftText.setTextColor(
-                Color.BLACK
-        );
-
-        leftText.setGravity(
-                Gravity.CENTER_VERTICAL
-        );
-
-
-        TextView rightText =
-                new TextView(this);
-
-        rightText.setText(right);
-
-        rightText.setTextSize(14);
-
-        rightText.setTextColor(
-                Color.BLACK
-        );
-
-        rightText.setGravity(
-                Gravity.RIGHT |
-                Gravity.CENTER_VERTICAL
-        );
-
-
-        row.addView(
-                leftText,
-                new LinearLayout.LayoutParams(
-                        0,
-                        dp(42),
-                        1
-                )
-        );
-
-
-        row.addView(
-                rightText,
-                new LinearLayout.LayoutParams(
-                        0,
-                        dp(42),
-                        1
-                )
-        );
-
-
-        parent.addView(row);
-
-
-        return rightText;
+    TextView label(String s) {
+        TextView t = tv(s, 12, true);
+        t.setTextColor(Color.DKGRAY);
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, dp(28));
+        p.setMargins(dp(2), dp(6), dp(2), 0);
+        t.setGravity(Gravity.BOTTOM);
+        t.setLayoutParams(p);
+        return t;
     }
 
+    LinearLayout.LayoutParams fieldParams(int h) {
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, dp(h));
+        return p;
+    }
 
-    // =========================================================
-    // TAX CALCULATION
-    // =========================================================
+    Button button(String text, int bgColor, int textColor) {
+        Button b = new Button(this);
+        b.setText(text); b.setTextColor(textColor);
+        b.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+        b.setAllCaps(false);
+        b.setGravity(Gravity.CENTER);
+        b.setPadding(dp(8), 0, dp(8), 0);
+        b.setBackground(bg(bgColor, 8));
+        return b;
+    }
+
+    LinearLayout.LayoutParams buttonParams(int h) {
+        return new LinearLayout.LayoutParams(-1, dp(h));
+    }
+
+    TextView addRow(LinearLayout parent, String left, String right, boolean bold) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        TextView a = tv(left, bold ? 15 : 13, bold);
+        TextView c = tv(right, bold ? 15 : 13, bold);
+        c.setGravity(Gravity.RIGHT);
+        row.addView(a, new LinearLayout.LayoutParams(0, dp(34), 1));
+        row.addView(c, new LinearLayout.LayoutParams(0, dp(34), 1));
+        parent.addView(row);
+        return c;
+    }
 
     void updateCalc() {
-
         double total = parse();
-
-        double base =
-                total / 1.05;
-
-        double gst =
-                total - base;
-
-
-        baseText.setText(
-                money(base)
-        );
-
-        gstText.setText(
-                money(gst)
-        );
-
-        totalText.setText(
-                money(total)
-        );
+        double base = total / 1.05;
+        double gst = total - base;
+        baseText.setText(money(base));
+        gstText.setText(money(gst));
+        totalText.setText(money(total));
     }
-
 
     double parse() {
-
-        try {
-
-            return Double.parseDouble(
-                    amount.getText().toString()
-            );
-
-        } catch (Exception e) {
-
-            return 0;
-        }
+        try { return Double.parseDouble(amount.getText().toString()); }
+        catch(Exception e){ return 0; }
     }
 
-
-    String money(double x) {
-
-        return String.format(
-                Locale.US,
-                "Rs.%.2f",
-                x
-        );
-    }
-
-
-    // =========================================================
-    // BLUETOOTH PERMISSION
-    // =========================================================
+    String money(double x) { return String.format(Locale.US, "₹%.2f", x); }
 
     void requestBtPermission() {
-
-        if (
-                Build.VERSION.SDK_INT >= 31 &&
-                checkSelfPermission(
-                        Manifest.permission.BLUETOOTH_CONNECT
-                ) != PackageManager.PERMISSION_GRANTED
-        ) {
-
-            requestPermissions(
-                    new String[]{
-                            Manifest.permission.BLUETOOTH_CONNECT,
-                            Manifest.permission.BLUETOOTH_SCAN
-                    },
-                    REQ_BT
-            );
+        if (Build.VERSION.SDK_INT >= 31 &&
+            checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN}, REQ_BT);
         }
     }
-
-
-    @Override
-    public void onRequestPermissionsResult(
-            int requestCode,
-            String[] permissions,
-            int[] results) {
-
-        super.onRequestPermissionsResult(
-                requestCode,
-                permissions,
-                results
-        );
-
-
-        if (requestCode == REQ_BT) {
-
-            boolean granted = true;
-
-
-            for (int r : results) {
-
-                if (
-                        r != PackageManager.PERMISSION_GRANTED
-                ) {
-
-                    granted = false;
-                }
-            }
-
-
-            if (granted) {
-
-                autoLoadPrinter();
-
-            } else {
-
-                toast(
-                        "Bluetooth permission is required to print."
-                );
-            }
-        }
-    }
-
-
-    // =========================================================
-    // LOAD SAVED PRINTER
-    // =========================================================
 
     void autoLoadPrinter() {
-
-        String mac =
-                prefs.getString(
-                        "printer_mac",
-                        ""
-                );
-
-
-        if (
-                mac.isEmpty() ||
-                bt == null
-        ) {
-
-            return;
-        }
-
-
-        if (
-                Build.VERSION.SDK_INT >= 31 &&
-                checkSelfPermission(
-                        Manifest.permission.BLUETOOTH_CONNECT
-                ) != PackageManager.PERMISSION_GRANTED
-        ) {
-
-            return;
-        }
-
-
+        String mac = prefs.getString("printer_mac", "");
+        if (mac.isEmpty() || bt == null) return;
+        if (Build.VERSION.SDK_INT >= 31 &&
+            checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) return;
         try {
-
-            selectedPrinter =
-                    bt.getRemoteDevice(mac);
-
-
-            String name =
-                    selectedPrinter.getName();
-
-
-            if (name == null ||
-                    name.trim().isEmpty()) {
-
-                name = "MPT-II";
-            }
-
-
-            printerText.setText(
-                    "Printer: " +
-                    name +
-                    " (saved)"
-            );
-
-
-        } catch (Exception ignored) {
-        }
+            selectedPrinter = bt.getRemoteDevice(mac);
+            String n = selectedPrinter.getName();
+            printerText.setText("Printer: " + (n == null ? "saved printer" : n));
+        } catch(Exception ignored) {}
     }
-
-
-    // =========================================================
-    // SELECT PRINTER
-    // =========================================================
 
     void choosePrinter() {
-
-        if (bt == null) {
-
-            toast(
-                    "This phone does not support Bluetooth."
-            );
-
+        if (bt == null) { toast("This phone does not support Bluetooth."); return; }
+        if (Build.VERSION.SDK_INT >= 31 &&
+            checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+            requestBtPermission(); return;
+        }
+        Set<BluetoothDevice> devices = bt.getBondedDevices();
+        if (devices == null || devices.isEmpty()) {
+            toast("Pair your 58mm printer in Android Bluetooth settings first.");
+            startActivity(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS));
             return;
         }
-
-
-        if (
-                Build.VERSION.SDK_INT >= 31 &&
-                checkSelfPermission(
-                        Manifest.permission.BLUETOOTH_CONNECT
-                ) != PackageManager.PERMISSION_GRANTED
-        ) {
-
-            requestBtPermission();
-
-            return;
+        ArrayList<BluetoothDevice> list = new ArrayList<>(devices);
+        String[] names = new String[list.size()];
+        for(int i=0;i<list.size();i++) {
+            String n = list.get(i).getName();
+            names[i] = (n == null ? "Bluetooth device" : n) + "\n" + list.get(i).getAddress();
         }
-
-
-        Set<BluetoothDevice> devices =
-                bt.getBondedDevices();
-
-
-        if (
-                devices == null ||
-                devices.isEmpty()
-        ) {
-
-            toast(
-                    "Pair your 58mm printer in Android Bluetooth settings first."
-            );
-
-
-            startActivity(
-                    new Intent(
-                            Settings.ACTION_BLUETOOTH_SETTINGS
-                    )
-            );
-
-
-            return;
-        }
-
-
-        ArrayList<BluetoothDevice> list =
-                new ArrayList<>(devices);
-
-
-        String[] names =
-                new String[list.size()];
-
-
-        for (
-                int i = 0;
-                i < list.size();
-                i++
-        ) {
-
-            String n =
-                    list.get(i).getName();
-
-
-            names[i] =
-                    (
-                            n == null
-                                    ? "Bluetooth device"
-                                    : n
-                    )
-                    +
-                    "\n"
-                    +
-                    list.get(i).getAddress();
-        }
-
-
-        new AlertDialog.Builder(this)
-
-                .setTitle(
-                        "Select 58mm thermal printer"
-                )
-
-                .setItems(
-                        names,
-                        (d, which) -> {
-
-                            selectedPrinter =
-                                    list.get(which);
-
-
-                            prefs.edit()
-                                    .putString(
-                                            "printer_mac",
-                                            selectedPrinter.getAddress()
-                                    )
-                                    .apply();
-
-
-                            String name =
-                                    selectedPrinter.getName();
-
-
-                            if (
-                                    name == null ||
-                                    name.trim().isEmpty()
-                            ) {
-
-                                name = "MPT-II";
-                            }
-
-
-                            printerText.setText(
-                                    "Printer: " +
-                                    name +
-                                    " (saved)"
-                            );
-
-
-                            toast(
-                                    "Printer saved. Next time you can just press PRINT."
-                            );
-                        }
-                )
-
-                .show();
+        new AlertDialog.Builder(this).setTitle("Select 58mm printer")
+            .setItems(names, (d, which) -> {
+                selectedPrinter = list.get(which);
+                prefs.edit().putString("printer_mac", selectedPrinter.getAddress()).apply();
+                printerText.setText("Printer: " + selectedPrinter.getName());
+                toast("Printer saved.");
+            }).show();
     }
 
-
-    // =========================================================
-    // PRINT RECEIPT
-    // =========================================================
-
     void printReceipt() {
-
         double total = parse();
+        if (total <= 0) { toast("Please enter the total amount."); amount.requestFocus(); return; }
+        if (selectedPrinter == null) { choosePrinter(); return; }
 
-
-        if (total <= 0) {
-
-            toast(
-                    "Please enter the total amount."
-            );
-
-            amount.requestFocus();
-
-            return;
-        }
-
-
-        if (selectedPrinter == null) {
-
-            choosePrinter();
-
-            return;
-        }
-
-
-        String productName =
-                product.getText()
-                        .toString()
-                        .trim();
-
-
-        double base =
-                total / 1.05;
-
-
-        double gst =
-                total - base;
-
-
-        final BluetoothDevice printer =
-                selectedPrinter;
-
+        String productName = product.getText().toString().trim();
+        double base = total / 1.05, gst = total - base;
 
         new Thread(() -> {
-
             BluetoothSocket socket = null;
-
-
             try {
-
-                // -------------------------------------------------
-                // BLUETOOTH PERMISSION
-                // -------------------------------------------------
-
-                if (
-                        Build.VERSION.SDK_INT >= 31 &&
-                        checkSelfPermission(
-                                Manifest.permission.BLUETOOTH_CONNECT
-                        ) != PackageManager.PERMISSION_GRANTED
-                ) {
-
-                    runOnUiThread(
-                            () -> toast(
-                                    "Bluetooth permission is required."
-                            )
-                    );
-
+                if (Build.VERSION.SDK_INT >= 31 &&
+                    checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                    runOnUiThread(() -> toast("Bluetooth permission is required."));
                     return;
                 }
-
-
-                // -------------------------------------------------
-                // STOP BLUETOOTH DISCOVERY
-                // -------------------------------------------------
-
-                try {
-
-                    if (
-                            bt != null &&
-                            bt.isDiscovering()
-                    ) {
-
-                        bt.cancelDiscovery();
-                    }
-
-                } catch (Exception ignored) {
+                socket = selectedPrinter.createRfcommSocketToServiceRecord(SPP_UUID);
+                socket.connect();
+                OutputStream out = socket.getOutputStream();
+                out.write(new byte[]{0x1B,0x40});
+                out.write(center());
+                out.write(text("HEALTHY FOOD GETS BETTER\n"));
+                out.write(text("GST: 06KOWPS3125E2ZF\n"));
+                out.write(text("FSSAI: 22724926000547\n"));
+                out.write(text(dateTimeLine() + "\n"));
+                out.write(text("------------------------------\n"));
+                if (!productName.isEmpty()) {
+                    out.write(text("Product: " + fit(productName, 24) + "\n"));
+                    out.write(text("------------------------------\n"));
                 }
-
-
-                // -------------------------------------------------
-                // TRY DIFFERENT SPP CONNECTION METHODS
-                // -------------------------------------------------
-
-                Exception last = null;
-
-
-                BluetoothSocket[] candidates =
-                        new BluetoothSocket[3];
-
-
-                try {
-
-                    candidates[0] =
-                            printer
-                                    .createInsecureRfcommSocketToServiceRecord(
-                                            SPP_UUID
-                                    );
-
-                } catch (Exception e) {
-
-                    last = e;
-                }
-
-
-                try {
-
-                    candidates[1] =
-                            printer
-                                    .createRfcommSocketToServiceRecord(
-                                            SPP_UUID
-                                    );
-
-                } catch (Exception e) {
-
-                    last = e;
-                }
-
-
-                try {
-
-                    java.lang.reflect.Method m =
-                            printer
-                                    .getClass()
-                                    .getMethod(
-                                            "createRfcommSocket",
-                                            int.class
-                                    );
-
-
-                    candidates[2] =
-                            (BluetoothSocket)
-                                    m.invoke(
-                                            printer,
-                                            1
-                                    );
-
-                } catch (Exception e) {
-
-                    last = e;
-                }
-
-
-                // -------------------------------------------------
-                // CONNECT
-                // -------------------------------------------------
-
-                for (
-                        BluetoothSocket candidate :
-                        candidates
-                ) {
-
-                    if (candidate == null) {
-
-                        continue;
-                    }
-
-
-                    try {
-
-                        candidate.connect();
-
-
-                        socket =
-                                candidate;
-
-
-                        break;
-
-
-                    } catch (Exception e) {
-
-                        last = e;
-
-
-                        try {
-
-                            candidate.close();
-
-                        } catch (Exception ignored) {
-                        }
-                    }
-                }
-
-
-                if (
-                        socket == null ||
-                        !socket.isConnected()
-                ) {
-
-                    throw new IOException(
-                            "Unable to connect to printer",
-                            last
-                    );
-                }
-
-
-                // -------------------------------------------------
-                // OUTPUT STREAM
-                // -------------------------------------------------
-
-                OutputStream out =
-                        socket.getOutputStream();
-
-
-                // Give printer time to finish Bluetooth setup.
-
-                try {
-
-                    Thread.sleep(800);
-
-                } catch (InterruptedException ignored) {
-
-                    Thread.currentThread()
-                            .interrupt();
-                }
-
-
-                // -------------------------------------------------
-                // INITIALIZE PRINTER
-                // -------------------------------------------------
-
-                out.write(
-                        new byte[]{
-                                0x1B,
-                                0x40
-                        }
-                );
-
-
-                // -------------------------------------------------
-                // RECEIPT HEADER
-                // -------------------------------------------------
-
-                out.write(
-                        center()
-                );
-
-
-                out.write(
-                        text(
-                                "HEALTHY FOOD GETS BETTER\n"
-                        )
-                );
-
-
-                out.write(
-                        text(
-                                "GST: 06KOWPS3125E2ZF\n"
-                        )
-                );
-
-
-                out.write(
-                        text(
-                                "FSSAI: 22724926000547\n"
-                        )
-                );
-
-
-                out.write(
-                        text(
-                                "--------------------------------\n"
-                        )
-                );
-
-
-                // -------------------------------------------------
-                // PRODUCT
-                // -------------------------------------------------
-
-                if (
-                        !productName.isEmpty()
-                ) {
-
-                    out.write(
-                            text(
-                                    "Product: " +
-                                    fit(
-                                            safeText(productName),
-                                            24
-                                    ) +
-                                    "\n"
-                            )
-                    );
-
-
-                    out.write(
-                            text(
-                                    "--------------------------------\n"
-                            )
-                    );
-                }
-
-
-                // -------------------------------------------------
-                // AMOUNT
-                // -------------------------------------------------
-
-                out.write(
-                        leftRight(
-                                "Amount:",
-                                money(base)
-                        )
-                );
-
-
-                out.write(
-                        leftRight(
-                                "IGST @ 5%:",
-                                money(gst)
-                        )
-                );
-
-
-                out.write(
-                        text(
-                                "--------------------------------\n"
-                        )
-                );
-
-
-                // -------------------------------------------------
-                // TOTAL
-                // -------------------------------------------------
-
-                out.write(
-                        bold(true)
-                );
-
-
-                out.write(
-                        leftRight(
-                                "TOTAL PAID:",
-                                money(total)
-                        )
-                );
-
-
-                out.write(
-                        bold(false)
-                );
-
-
-                // -------------------------------------------------
-                // PAYMENT
-                // -------------------------------------------------
-
-                out.write(
-                        text(
-                                "PAYMENT: CASH\n"
-                        )
-                );
-
-
-                out.write(
-                        text(
-                                "--------------------------------\n"
-                        )
-                );
-
-
-                // -------------------------------------------------
-                // FOOTER
-                // -------------------------------------------------
-
-                out.write(
-                        center()
-                );
-
-
-                out.write(
-                        text(
-                                "Thank you for the service..!!\n"
-                        )
-                );
-
-
-                out.write(
-                        text(
-                                "Please visit again..!!\n\n\n"
-                        )
-                );
-
-
-                // No cutter command.
-                // Many low-cost 58mm printers do not
-                // have a cutter.
-
-
-                out.flush();
-
-
-                try {
-
-                    Thread.sleep(700);
-
-                } catch (InterruptedException ignored) {
-
-                    Thread.currentThread()
-                            .interrupt();
-                }
-
-
-                out.close();
-
-
-                socket.close();
-
-
-                // -------------------------------------------------
-                // SUCCESS
-                // -------------------------------------------------
-
-                runOnUiThread(() -> {
-
-                    toast(
-                            "Receipt sent to printer."
-                    );
-
-
-                    amount.setText("");
-
-                    product.setText("");
-
-                    amount.requestFocus();
-                });
-
-
-            } catch (Exception e) {
-
-
-                try {
-
-                    if (socket != null) {
-
-                        socket.close();
-                    }
-
-                } catch (Exception ignored) {
-                }
-
-
-                String detail =
-                        e.getMessage();
-
-
-                if (
-                        detail == null ||
-                        detail.trim().isEmpty()
-                ) {
-
-                    detail =
-                            e.getClass()
-                                    .getSimpleName();
-                }
-
-
-                final String msg =
-                        detail;
-
-
-                runOnUiThread(
-                        () -> toast(
-                                "Printing failed: " +
-                                msg +
-                                "\nCheck printer is ON, paired and Bluetooth Classic/ESC-POS is supported."
-                        )
-                );
+                out.write(leftRight("Amount:", money(base)));
+                out.write(leftRight("IGST @ 5%:", money(gst)));
+                out.write(text("------------------------------\n"));
+                out.write(bold(true));
+                out.write(leftRight("TOTAL PAID:", money(total)));
+                out.write(bold(false));
+                out.write(text("PAYMENT: CASH\n"));
+                out.write(text("------------------------------\n"));
+                out.write(center());
+                
+                out.write(text("Please visit again..!!\n\n\n"));
+                out.write(cut());
+                out.flush(); out.close(); socket.close();
+                runOnUiThread(() -> { toast("Receipt printed."); amount.setText(""); product.setText(""); amount.requestFocus(); });
+            } catch(Exception e) {
+                try { if(socket != null) socket.close(); } catch(Exception ignored) {}
+                runOnUiThread(() -> toast("Printing failed. Check printer is ON and paired."));
             }
-
         }).start();
     }
 
-
-    // =========================================================
-    // PRINTER TEXT HELPERS
-    // =========================================================
-
-    String fit(
-            String s,
-            int max) {
-
-        return s.length() <= max
-                ? s
-                : s.substring(0, max);
+    String dateTimeLine() {
+        SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yy   'Time:' hh:mm a", Locale.US);
+        sdf.setTimeZone(TimeZone.getTimeZone("Asia/Kolkata"));
+        return "Date: " + sdf.format(new Date());
     }
 
-
-    String safeText(
-            String s) {
-
-        return s
-                .replace("₹", "Rs.")
-                .replaceAll(
-                        "[^\\x20-\\x7E]",
-                        "?"
-                );
+    String fit(String s, int max) { return s.length() <= max ? s : s.substring(0, max); }
+    byte[] center(){ return new byte[]{0x1B,0x61,0x01}; }
+    byte[] bold(boolean on){ return new byte[]{0x1B,0x45,(byte)(on?1:0)}; }
+    byte[] text(String s){ return s.getBytes(StandardCharsets.UTF_8); }
+    byte[] leftRight(String a,String b){
+        int width=32, spaces=Math.max(1,width-a.length()-b.length());
+        return text(a + " ".repeat(spaces) + b + "\n");
     }
-
-
-    byte[] center() {
-
-        return new byte[]{
-                0x1B,
-                0x61,
-                0x01
-        };
-    }
-
-
-    byte[] bold(
-            boolean on) {
-
-        return new byte[]{
-                0x1B,
-                0x45,
-                (byte) (on ? 1 : 0)
-        };
-    }
-
-
-    byte[] text(
-            String s) {
-
-        return s.getBytes(
-                StandardCharsets.UTF_8
-        );
-    }
-
-
-    byte[] leftRight(
-            String a,
-            String b) {
-
-        int width = 32;
-
-
-        int spaces =
-                Math.max(
-                        1,
-                        width -
-                        a.length() -
-                        b.length()
-                );
-
-
-        return text(
-                a +
-                " ".repeat(spaces) +
-                b +
-                "\n"
-        );
-    }
-
-
-    byte[] cut() {
-
-        return new byte[]{
-                0x1D,
-                0x56,
-                0x00
-        };
-    }
-
-
-    // =========================================================
-    // LOGO GRAYSCALE
-    // =========================================================
-
-    ColorMatrix grayMatrix() {
-
-        ColorMatrix m =
-                new ColorMatrix();
-
-        m.setSaturation(0);
-
-        return m;
-    }
-
-
-    // =========================================================
-    // TOAST
-    // =========================================================
-
-    void toast(
-            String s) {
-
-        Toast.makeText(
-                this,
-                s,
-                Toast.LENGTH_LONG
-        ).show();
-    }
+    byte[] cut(){ return new byte[]{0x1D,0x56,0x00}; }
+    ColorMatrix grayMatrix(){ ColorMatrix m=new ColorMatrix(); m.setSaturation(0); return m; }
+    void toast(String s){ Toast.makeText(this,s,Toast.LENGTH_LONG).show(); }
 }
