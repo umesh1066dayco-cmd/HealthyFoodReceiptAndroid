@@ -202,9 +202,9 @@ public class MainActivity extends Activity {
     }
 
     void updateCalc() {
-        double total = parse();
-        double base = total / 1.05;
-        double gst = total - base;
+        double total = round2(parse());
+        double base = round2(total / 1.05);
+        double gst = round2(total - base);
         baseText.setText(money(base));
         gstText.setText(money(gst));
         totalText.setText(money(total));
@@ -215,7 +215,11 @@ public class MainActivity extends Activity {
         catch(Exception e){ return 0; }
     }
 
-    String money(double x) { return String.format(Locale.US, "₹%.2f", x); }
+    double round2(double x) {
+        return Math.round(x * 100.0) / 100.0;
+    }
+
+    String money(double x) { return String.format(Locale.US, "Rs. %.2f", x); }
 
     void requestBtPermission() {
         if (Build.VERSION.SDK_INT >= 31 &&
@@ -269,7 +273,8 @@ public class MainActivity extends Activity {
         if (selectedPrinter == null) { choosePrinter(); return; }
 
         String productName = product.getText().toString().trim();
-        double base = total / 1.05, gst = total - base;
+        total = round2(total);
+        double base = round2(total / 1.05), gst = round2(total - base);
 
         new Thread(() -> {
             BluetoothSocket socket = null;
