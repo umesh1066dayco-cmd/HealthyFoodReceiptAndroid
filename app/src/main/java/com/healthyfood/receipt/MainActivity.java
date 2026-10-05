@@ -268,13 +268,14 @@ public class MainActivity extends Activity {
     }
 
     void printReceipt() {
-        double total = parse();
-        if (total <= 0) { toast("Please enter the total amount."); amount.requestFocus(); return; }
+        double enteredTotal = parse();
+        if (enteredTotal <= 0) { toast("Please enter the total amount."); amount.requestFocus(); return; }
         if (selectedPrinter == null) { choosePrinter(); return; }
 
-        String productName = product.getText().toString().trim();
-        total = round2(total);
-        double base = round2(total / 1.05), gst = round2(total - base);
+        final String productName = product.getText().toString().trim();
+        final double total = round2(enteredTotal);
+        final double base = round2(total / 1.05);
+        final double gst = round2(total - base);
 
         new Thread(() -> {
             BluetoothSocket socket = null;
